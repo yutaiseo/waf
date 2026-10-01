@@ -1,0 +1,89 @@
+# ============================================================
+# WAF Phase 1 — Docker Compose
+# 一键启动 Caddy + Coraza + OWASP CRS
+# Phase 1 只需要这一个容器 + 一个 Redis（预留后续扩展）
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ===== WAF 数据平面（Caddy + coraza-caddy v2）=====
+  caddy:
+    build:
+      context: ../data-plane
+      dockerfile: Dockerfile
+    container_name: waf-node-1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2019:2019"   # Caddy 管理 API（健康检查用）
+    volumes:
+      # 核心配置（只读挂载）
+      - ../data-plane/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../data-plane/coraza.conf-recommended:/etc/caddy/coraza.conf-recommended:ro
+      - ../data-plane/crs-setup.conf.example:/etc/caddy/crs-setup.conf.example:ro
+      - ../data-plane/blocked.html:/etc/caddy/blocked.html:ro
+      # 自定义规则
+      - ../data-plane/rules/custom:/etc/caddy/custom:ro
+      # OWASP CRS v4 规则集（需要提前 git clone）
+      - ../data-plane/rules/owasp-crs/rules:/etc/coraza/owasp_crs:ro
+      # 运行时数据（证书、状态）
+      - caddy_data:/data
+      - caddy_config:/config
+      # Coraza 审计日志
+      - coraza_logs:/var/log/coraza
+      # Caddy 访问日志
+      - caddy_logs:/var/log/caddy
+      # Coraza 临时文件
+      - coraza_tmp:/tmp/coraza
+      - coraza_data:/etc/coraza/data
+    environment:
+      # WAF 模式：production / monitor / bypass
+      - WAF_MODE=${WAF_MODE:-production}
+      # 站点数（多站点时用）
+      - WAF_SITES=${WAF_SITES:-1}
+    # 资源限制（Fail-Safe）
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ===== Redis — Phase 2 用（分布式状态、限流、IP 黑名单）=====
+  # Phase 1 先注释掉，不引入不必要的组件
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: waf-redis
+  #   restart: unless-stopped
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save "" --appendonly no
+  #   volumes:
+  #     - redis_data:/data
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.5'
+  #         memory: 256M
+
+volumes:
+  caddy_data:
+  caddy_config:
+  coraza_logs:
+  coraza_tmp:
+  coraza_data:
+  caddy_logs:
+  # redis_data:

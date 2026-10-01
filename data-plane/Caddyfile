@@ -1,0 +1,128 @@
+# ============================================================
+# WAF Phase 1 — Caddyfile
+# Caddy v2 + coraza-caddy v2 + OWASP CRS v4
+# ============================================================
+# 修改说明：
+#   1. 把 yourdomain.com / www.yourdomain.com 改成你的真实域名
+#   2. 把 123.45.67.89 改成 IDC 虚拟主机的真实 IP
+#   3. 把 :80 改成 IDC 的真实端口（一般就是 80）
+#   4. 首次部署建议用 DetectionOnly 模式跑 7 天
+# ============================================================
+
+{
+    # ===== Coraza WAF 必须排在第一个执行 =====
+    order coraza_waf first
+
+    # ===== 日志配置 =====
+    log {
+        level INFO
+        output file /var/log/caddy/access.log {
+            roll_size 100MiB
+            roll_keep 10
+            roll_keep_for 720h
+        }
+    }
+
+    # ===== 全局健康检查端点 =====
+    :2019 {
+        @internal path /health
+        respond @internal 200
+        respond "Caddy admin endpoint" 403
+    }
+}
+
+# ============================================================
+# 站点 A — 你的主站（示例）
+# ============================================================
+yourdomain.com, www.yourdomain.com {
+
+    # ===== WAF 检测引擎 =====
+    coraza_waf {
+        # 自动加载 OWASP CRS v4（嵌入在 coraza-caddy 中）
+        load_owasp_crs
+
+        # Coraza 规则指令块 — 按顺序执行
+        directives `
+            # 1. Coraza 推荐的基础配置（性能优化、安全设置）
+            Include @coraza.conf-recommended
+
+            # 2. OWASP CRS 全局设置（paranoia_level、白名单 IP 等）
+            Include @crs-setup.conf.example
+
+            # 3. OWASP CRS 全部规则（2000+ 条通用攻击检测规则）
+            Include @owasp_crs/*.conf
+
+            # 4. 你的自定义规则（放在 data-plane/rules/custom/ 下）
+            Include /etc/caddy/custom/*.conf
+
+            # 5. 引擎开关 — 关键！
+            #    On           = 拦截 + 记录
+            #    DetectionOnly = 只记录不拦截（试运行用）
+            #    Off          = 完全关闭检测
+            SecRuleEngine DetectionOnly
+        `
+
+        # WAF 拦截时的响应（而不是默认的 403）
+        # 可以换成自定义 HTML 页面
+        custom_redirect {
+            status 403
+            file /etc/caddy/blocked.html
+        }
+    }
+
+    # ===== 安全响应头（硬加固） =====
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        X-XSS-Protection "1; mode=block"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+
+    # ===== 隐藏敏感文件和目录（即使没有被攻击） =====
+    @hidden path /\.git/* /\.env /wp-config.php /config.php /adminer.php
+    respond @hidden 404
+
+    # ===== 反代到 IDC 虚拟主机 =====
+    reverse_proxy 123.45.67.89:80 {
+        # 真实 IP 传递 — 让 IDC CMS 能看到访客 IP
+        header_up X-Real-IP {remote.host}
+        header_up X-Forwarded-For {remote.host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # IDC 那边 Host 保持你的域名（虚拟主机靠 Host 路由）
+        header_up Host {host}
+
+        # 超时（IDC 虚拟主机一般比较慢）
+        transport http {
+            dial_timeout 10s
+            read_timeout 60s
+            write_timeout 60s
+        }
+
+        # 失败重试
+        lb_policy first
+    }
+
+    # ===== 基础安全：不让 IDC 暴露版本信息 =====
+    header_down -Server
+    header_down -X-Powered-By
+}
+
+# ============================================================
+# 站点 B — 第二个站点（示例，如果只有一个站点可以删掉）
+# ============================================================
+# api.yourdomain.com {
+#     coraza_waf {
+#         load_owasp_crs
+#         directives `
+#             Include @coraza.conf-recommended
+#             Include @crs-setup.conf.example
+#             Include @owasp_crs/*.conf
+#             Include /etc/caddy/custom/*.conf
+#             SecRuleEngine DetectionOnly
+#         `
+#     }
+#     reverse_proxy 123.45.67.89:8080
+# }

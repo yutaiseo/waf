@@ -1,0 +1,89 @@
+# ============================================================
+# OWASP CRS v4 设置 (crs-setup.conf.example)
+# 这个文件控制 CRS 规则的全局行为
+# ============================================================
+
+# --- CRS 版本 ---
+tx.paranoia_level=2
+# Paranoia Level 说明：
+#   1 = 最宽松（误报少，但漏拦多）
+#   2 = 默认平衡
+#   3 = 严格（多检测项，但误报多）
+#   4 = 最严格（所有检测项全开）
+# Phase 1 建议先用 2，稳定后再考虑 3
+
+# --- 执行模式 ---
+tx.executing_mode=1
+# 0 = 只执行发现的攻击
+# 1 = 执行所有规则但跳过已知白名单
+
+# --- 默认动作 ---
+tx.blocking_mode=1
+# 1 = 返回 403 并关闭连接
+# 2 = 返回 403 但保持连接（影响性能）
+
+# --- 白名单 IP（这些 IP 永远不检测）---
+# 格式: IP 或 CIDR，用 "|" 分隔
+tx.allowed_request_content_type=
+tx.allowed_request_content_type_charset=
+tx.allowed_http_versions=
+tx.allowed_methods=GET|HEAD|POST|OPTIONS|PUT|DELETE|PATCH
+tx.allowed_media_type=
+tx.allowed_ra_ips=
+# 如果你有固定办公 IP 不想被拦，加在这里：
+# tx.allowed_ra_ips=114.82.12.0/24|223.4.5.6
+
+# --- 全局排除规则（路径白名单）---
+tx.exclusion_patterns=
+# 示例：排除 WordPress 核心文件的良性访问
+# tx.exclusion_patterns=^/wp-admin/admin-ajax.php$|^/wp-includes/
+
+# --- 扫描器伪装 ---
+tx.scanner_detector_engine=1
+# 0 = 关闭
+# 1 = 基础检测
+# 2 = 深度检测
+
+# --- HTTP 参数限制 ---
+tx.max_num_args=255
+tx.arg_name_length=100
+tx.arg_length=400
+tx.cookie_length=400
+tx.max_file_size=12582912
+
+# --- 编码处理 ---
+tx.allow_origin_empty=0
+tx.restricted_extensions=.asa/.asax/.asc/.ashx/.asmx/.aspx/.cer/.cdx/.dll/.exe/.fla/.flv/.frm/.html/.htaccess/.jar/.jpg/.js/.log/.new/.pl/.png/.psd/.reg/.sh/.so/.sql/.swf/.txt/.tif/.tiff/.txt/.xml
+
+# --- 异常分数阈值 ---
+tx.inbound_anomaly_score_threshold=5      # 请求得分 > 5 触发拦截
+tx.outbound_anomaly_score_threshold=4     # 响应得分 > 4 触发拦截
+tx.error_anomaly_score_threshold=4        # 异常得分阈值
+tx.xss_anomaly_score_threshold=3
+tx.sql_injection_anomaly_score_threshold=4
+
+# --- 攻击类型分数 ---
+tx.inbound_anomaly_score_pl1=3
+tx.inbound_anomaly_score_pl2=4
+tx.inbound_anomaly_score_pl3=5
+tx.inbound_anomaly_score_pl4=6
+
+tx.outbound_anomaly_score_pl1=3
+tx.outbound_anomaly_score_pl2=4
+tx.outbound_anomaly_score_pl3=5
+tx.outbound_anomaly_score_pl4=6
+
+tx.error_anomaly_score_pl1=3
+tx.error_anomaly_score_pl2=4
+tx.error_anomaly_score_pl3=5
+tx.error_anomaly_score_pl4=6
+
+tx.xss_anomaly_score_pl1=3
+tx.xss_anomaly_score_pl2=4
+tx.xss_anomaly_score_pl3=5
+tx.xss_anomaly_score_pl4=6
+
+tx.sql_injection_anomaly_score_pl1=4
+tx.sql_injection_anomaly_score_pl2=5
+tx.sql_injection_anomaly_score_pl3=6
+tx.sql_injection_anomaly_score_pl4=7

@@ -1,0 +1,32 @@
+# ============================================================
+# WAF 项目 .gitignore
+# ============================================================
+
+# --- OWASP CRS v4（大依赖，不入库，用 init 脚本下载）---
+data-plane/rules/owasp-crs/
+!data-plane/rules/owasp-crs/.gitkeep
+
+# --- 运行时日志 ---
+logs/
+*.log
+!logs/.gitkeep
+
+# --- Docker volumes（本地开发的容器数据）---
+.docker/
+
+# --- 系统文件 ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- 编辑器 ---
+.vscode/
+.idea/
+*.iml
+
+# --- 构建产物 ---
+*.tar
+*.tar.gz
+*.zip

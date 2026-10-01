@@ -1,0 +1,44 @@
+# ============================================================
+# Coraza 推荐配置（coraza.conf-recommended）
+# 由 Coraza 官方提供，调优性能和安全
+# 一般不需要修改
+# ============================================================
+
+# --- 引擎模式 ---
+SecRuleEngine DetectionOnly
+
+# --- 请求体限制（防止大包 DoS）---
+SecRequestBodyAccess On
+SecRequestBodyLimit 13107200           # 12.5MB
+SecRequestBodyNoFilesLimit 131072      # 非文件请求体 128KB
+SecRequestBodyLimitAction Reject
+
+# --- 响应体检测 ---
+SecResponseBodyAccess On
+SecResponseBodyMimeType text/plain text/html text/xml application/json
+SecResponseBodyLimit 524288            # 响应体最大 512KB
+SecResponseBodyLimitAction ProcessPartial
+
+# --- 配置文件 ---
+SecTmpDir /tmp/coraza/tmp/
+SecDataDir /tmp/coraza/data/
+
+# --- TLS 处理 ---
+SecSSLUncleanShutdown Off
+
+# --- 规则执行优化 ---
+SecArgumentSeparator &
+SecCookieFormat 0
+
+# --- 审计日志（被拦截/匹配规则才写）---
+SecAuditEngine RelevantOnly
+SecAuditLogRelevantStatus "^(?:5|4(?!04))"
+SecAuditLogParts ABIJDEFHZ
+SecAuditLogType Serial
+SecAuditLog /var/log/coraza/audit.log
+
+# --- 性能状态（生产关闭）---
+SecStatusEngine Off
+
+# --- 全局变量 ---
+SecRule REQUEST_HEADERS:User-Agent "@rx Test" "id:1,phase:1,pass,setvar:'tx.safe_vars=1'"
