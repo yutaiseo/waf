@@ -1,34 +1,34 @@
 # ============================================================
-# WAF 数据平面 — Caddy + coraza-caddy + OWASP CRS
-# 多阶段构建：builder 阶段用 xcaddy 编译带 Coraza 插件的 Caddy
-# 生产阶段复制到干净的 alpine 镜像
+# WAF Dockerfile — 多阶段构建
+# 阶段1：xcaddy 编译带 coraza 模块的 caddy
+# 阶段2：用 caddy:2.11 运行
 # ============================================================
 
-# --- Stage 1: Build ---
+# ---------- 阶段 1：编译 ----------
 FROM caddy:2.11-builder AS builder
 
-# 用 xcaddy 编译 Caddy，嵌入 coraza-caddy v2 插件
-# pin 版本确保可复现构建
+# 编译 Caddy + coraza-caddy v2 模块
+# coraza-caddy/v2 对应 Caddy v2 的集成
 RUN xcaddy build \
-    --with github.com/corazawaf/coraza-caddy/v2
+    --with github.com/corazawaf/coraza-caddy/v2 \
+    --with github.com/corazawaf/coraza/v3 \
+    --with github.com/caddyserver/xcaddy
 
-# --- Stage 2: Runtime ---
+# ---------- 阶段 2：运行 ----------
 FROM caddy:2.11
 
-# 从 builder 复制编译好的 caddy 二进制
+# 复制编译好的 caddy 二进制
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
-# 设置基础目录权限
-RUN mkdir -p /var/log/coraza && \
-    touch /var/log/coraza/audit.log && \
-    chown -R caddy:caddy /var/log/coraza
+# 创建必要目录
+RUN mkdir -p /var/log/coraza /var/log/caddy /tmp/coraza /tmp/coraza/tmp /tmp/coraza/data
 
-# 暴露 80/443
-EXPOSE 80 443
+# 暴露端口
+EXPOSE 80 443 2019
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
     CMD wget -qO- http://localhost:2019/health || exit 1
 
-# 默认命令
+# 启动
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

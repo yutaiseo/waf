@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  waf:
+    image: caddy:2.11-builder
+    container_name: waf-node
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # 全部挂载到宝塔 www 目录下，方便在文件管理器里编辑
+      - /www/wwwroot/waf/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /www/wwwroot/waf/coraza.conf-recommended:/etc/caddy/coraza.conf-recommended:ro
+      - /www/wwwroot/waf/crs-setup.conf.example:/etc/caddy/crs-setup.conf.example:ro
+      - /www/wwwroot/waf/blocked.html:/etc/caddy/blocked.html:ro
+      - /www/wwwroot/waf/rules/custom:/etc/caddy/custom:ro
+      - /www/wwwroot/waf/rules/owasp-crs/rules:/etc/coraza/owasp_crs:ro
+      - /www/wwwroot/waf/logs/coraza:/var/log/coraza
+      - /www/wwwroot/waf/logs/caddy:/var/log/caddy
+      - /www/wwwroot/waf/data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - waf-net
+
+  fake-backend:
+    image: nginx:alpine
+    container_name: waf-fake-backend
+    command: >
+      bash -c 'echo "<h1>✅ IDC Fake Backend - WAF 测试 OK</h1><p>正常请求通过了 WAF</p>" > /usr/share/nginx/html/index.html && nginx -g "daemon off;"'
+    networks:
+      - waf-net
+
+networks:
+  waf-net:
