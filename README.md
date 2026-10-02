@@ -52,6 +52,82 @@ SamWaf 访问：`http://VPS_IP:26666`
 
 ---
 
+## ⚠️ 关键前提：VPS 防火墙必须开放端口
+
+**VPS 控制台（阿里云/腾讯云/AWS/搬瓦工）的安全组/防火墙必须放行以下端口，否则外部无法访问！**
+
+### Coraza + Caddy（自研方案）
+
+| 端口 | 协议 | 用途 | 必须开放 |
+|------|------|------|---------|
+| **80** | TCP | HTTP 流量入口（WAF 反代监听） | ✅ 是 |
+| **443** | TCP | HTTPS 流量入口 | ⭕ 有 HTTPS 时开放 |
+| 2019 | TCP | Caddy Admin API（管理 API，**不要对外开放**，用 SSH 隧道） | ❌ 否 |
+| 8080 | TCP | 测试端口（可选） | ❌ 否 |
+
+### SamWaf（GUI 方案）
+
+| 端口 | 协议 | 用途 | 必须开放 |
+|------|------|------|---------|
+| **80** | TCP | HTTP 流量入口 | ✅ 是 |
+| **443** | TCP | HTTPS 流量入口 | ⭕ 有 HTTPS 时开放 |
+| **26666** | TCP | **Web 管理界面（浏览器访问 WAF）** | ✅ 是 |
+
+### 宝塔面板自身也需要
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 8888 | TCP | 宝塔 Web 管理面板（默认） |
+
+### 防火墙配置方法
+
+**云服务商控制台（阿里云示例）**：
+```
+阿里云控制台 → ECS → 安全组 → 入方向规则 → 添加：
+  协议: TCP  端口: 80   授权对象: 0.0.0.0/0  (所有人可访问)
+  协议: TCP  端口: 443  授权对象: 0.0.0.0/0
+  协议: TCP  端口: 26666 授权对象: 0.0.0.0/0  (SamWaf GUI)
+  协议: TCP  端口: 8888 授权对象: 0.0.0.0/0  (宝塔)
+```
+
+**Linux 本机防火墙（如果开了）**：
+```bash
+# Ubuntu UFW
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 26666/tcp
+ufw allow 8888/tcp
+ufw reload
+
+# CentOS firewalld
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --permanent --add-port=26666/tcp
+firewall-cmd --reload
+```
+
+**验证端口是否开放（在本地电脑上执行）**：
+```bash
+# PowerShell
+Test-NetConnection -ComputerName VPS_IP -Port 80
+Test-NetConnection -ComputerName VPS_IP -Port 26666
+
+# 或浏览器直接访问
+http://VPS_IP:26666   ← 能打开 SamWaf 登录页 = 端口通了
+http://VPS_IP          ← 能看到 WAF 响应 = 80 端口通了
+```
+
+### 常见坑
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| 容器启动了但浏览器打不开 | 云安全组没放行 80 | 控制台添加规则 |
+| `curl localhost` 通但外部 IP 不通 | 本机防火墙（ufw/iptables）拦了 | `ufw allow` |
+| 80 端口被宝塔 Nginx 占了 | 两个服务抢同一个端口 | 宝塔面板里停 Nginx |
+| 443 端口被占 | 宝塔面板自身的 SSL 监听 | SamWaf 可以改 HTTPS 端口或关掉宝塔 SSL |
+
+---
+
 ## 目录结构
 
 ```
